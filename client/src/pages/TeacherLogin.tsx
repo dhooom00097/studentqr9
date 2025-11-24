@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
+
+
 export default function TeacherLogin() {
   const [, setLocation] = useLocation();
   const [username, setUsername] = useState("");
@@ -49,7 +51,7 @@ export default function TeacherLogin() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
+                placeholder="username"
                 required
                 disabled={isLoading}
                 autoComplete="username"

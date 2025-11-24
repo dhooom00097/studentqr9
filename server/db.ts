@@ -1,6 +1,7 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
+import bcrypt from "bcrypt";
 import { InsertUser, users, sessions, attendanceRecords, allowedStudents, InsertSession, InsertAttendanceRecord, InsertAllowedStudent } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -338,5 +339,82 @@ export async function removeAllowedStudent(sessionId: number, studentId: string)
   } catch (error) {
     console.error("Error removing allowed student:", error);
     throw new Error("Failed to remove allowed student");
+  }
+}
+
+// Teacher/User Management
+export async function createTeacher(username: string, password: string, name: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user with username as openId for local auth
+    const result = await db.insert(users).values({
+      openId: username,
+      name: name,
+      password: hashedPassword,
+      role: "teacher",
+      loginMethod: "local",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Error creating teacher:", error);
+    throw new Error("Failed to create teacher account");
+  }
+}
+
+export async function findUserByUsername(username: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    const user = await db.select().from(users).where(eq(users.openId, username)).limit(1);
+    return user[0] || null;
+  } catch (error) {
+    console.error("Error finding user:", error);
+    return null;
+  }
+}
+
+export async function changePassword(userId: number, oldPassword: string, newPassword: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  try {
+    // Get user
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user[0]) {
+      throw new Error("User not found");
+    }
+
+    // Verify old password
+    if (!user[0].password) {
+      throw new Error("This account doesn't have a password set");
+    }
+
+    const isValid = await bcrypt.compare(oldPassword, user[0].password);
+    if (!isValid) {
+      throw new Error("كلمة المرور القديمة غير صحيحة");
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await db.update(users)
+      .set({ password: hashedPassword })
+      .where(eq(users.id, userId));
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error changing password:", error);
+    throw error;
   }
 }

@@ -9,6 +9,7 @@ import TeacherDashboard from "./pages/TeacherDashboard";
 import SessionDetails from "./pages/SessionDetails";
 import StudentCheckIn from "./pages/StudentCheckIn";
 import TeacherLogin from "./pages/TeacherLogin";
+import TeacherSettings from "./pages/TeacherSettings";
 
 function Router() {
   return (
@@ -19,6 +20,7 @@ function Router() {
       <Route path={"/session/:id"} component={SessionDetails} />
       <Route path={"/checkin/:code"} component={StudentCheckIn} />
       <Route path={"/checkin"} component={StudentCheckIn} />
+      <Route path={"/settings"} component={TeacherSettings} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>

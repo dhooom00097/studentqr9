@@ -7,6 +7,8 @@ import { z } from "zod";
 import * as db from "./db";
 import { randomBytes } from "crypto";
 
+
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -16,6 +18,44 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true };
     }),
+
+    // Create new teacher account
+    createTeacher: publicProcedure
+      .input(z.object({
+        username: z.string().min(3),
+        password: z.string().min(6),
+        name: z.string().min(1),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          await db.createTeacher(input.username, input.password, input.name);
+          return { success: true };
+        } catch (error: any) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: error.message || "فشل في إنشاء حساب المعلم",
+          });
+        }
+      }),
+
+    // Change password
+    changePassword: publicProcedure
+      .input(z.object({
+        userId: z.number(),
+        oldPassword: z.string(),
+        newPassword: z.string().min(6),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          await db.changePassword(input.userId, input.oldPassword, input.newPassword);
+          return { success: true };
+        } catch (error: any) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message || "فشل في تغيير كلمة المرور",
+          });
+        }
+      }),
   }),
 
   attendance: router({

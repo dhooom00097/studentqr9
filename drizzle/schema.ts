@@ -16,10 +16,11 @@ export const users = sqliteTable("users", {
   name: text("name"),
   email: text("email"),
   loginMethod: text("loginMethod"),
-  role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
+  role: text("role", { enum: ["user", "admin", "teacher"] }).default("user").notNull(),
   createdAt: integer("createdAt", { mode: "timestamp" }).default(new Date()).notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).default(new Date()).notNull(), // SQLite doesn't support onUpdateNow natively in the same way, handled in app logic or trigger if needed, but for now default is fine
   lastSignedIn: integer("lastSignedIn", { mode: "timestamp" }).default(new Date()).notNull(),
+  password: text("password"),
 });
 
 export type User = typeof users.$inferSelect;

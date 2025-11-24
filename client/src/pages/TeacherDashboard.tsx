@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Plus, QrCode, Users, Clock, Eye, Trash2 } from "lucide-react";
+import { Loader2, Plus, QrCode, Users, Clock, Eye, Trash2, Settings } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -92,6 +92,10 @@ export default function TeacherDashboard() {
             <p className="text-gray-600">مرحباً بك</p>
           </div>
           <div className="flex gap-2">
+            <Button onClick={() => setLocation("/settings")} variant="outline" className="gap-2">
+              <Settings className="w-4 h-4" />
+              الإعدادات
+            </Button>
             <Button onClick={handleLogout} variant="outline">
               تسجيل الخروج
             </Button>
