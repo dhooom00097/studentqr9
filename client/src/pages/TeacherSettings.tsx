@@ -63,6 +63,8 @@ export default function TeacherSettings() {
         createTeacherMutation.mutate(newTeacher);
     };
 
+    const { data: user } = trpc.auth.me.useQuery();
+
     const handleChangePassword = () => {
         if (!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
             toast.error("يرجى ملء جميع الحقول");
@@ -79,7 +81,13 @@ export default function TeacherSettings() {
             return;
         }
 
+        if (!user?.id) {
+            toast.error("حدث خطأ في معرف المستخدم");
+            return;
+        }
+
         changePasswordMutation.mutate({
+            userId: user.id,
             oldPassword: passwordData.oldPassword,
             newPassword: passwordData.newPassword,
         });

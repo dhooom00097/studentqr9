@@ -1,6 +1,6 @@
 import { eq, desc, and, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 import bcrypt from "bcrypt";
 import { InsertUser, users, sessions, attendanceRecords, allowedStudents, InsertSession, InsertAttendanceRecord, InsertAllowedStudent } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -11,8 +11,10 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      const client = createClient({ url: process.env.DATABASE_URL });
-      _db = drizzle(client);
+      const pool = new pg.Pool({
+        connectionString: process.env.DATABASE_URL,
+      });
+      _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -142,7 +144,7 @@ export async function updateSessionStatus(id: number, isActive: boolean) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(sessions).set({ isActive: isActive ? 1 : 0 }).where(eq(sessions.id, id));
+  await db.update(sessions).set({ isActive: isActive }).where(eq(sessions.id, id));
 }
 
 // Attendance queries
@@ -321,8 +323,10 @@ export async function isStudentAllowed(sessionId: number, studentId: string): Pr
 
   // If list exists, check if student is in it
   const match = await db.select().from(allowedStudents)
-    .where(eq(allowedStudents.sessionId, sessionId))
-    .where(eq(allowedStudents.studentId, studentId))
+    .where(and(
+      eq(allowedStudents.sessionId, sessionId),
+      eq(allowedStudents.studentId, studentId)
+    ))
     .limit(1);
 
   return match.length > 0;
