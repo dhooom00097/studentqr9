@@ -291,6 +291,7 @@ export const appRouter = router({
           sessionId: session.id,
           sessionTitle: session.title,
           sessionDescription: session.description,
+          requireLocation: !!(session.latitude && session.longitude),
         };
       }),
 
