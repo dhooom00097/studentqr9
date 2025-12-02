@@ -202,7 +202,7 @@ export const appRouter = router({
         // Verify location if provided
         if (session.latitude && session.longitude) {
           if (!input.studentLatitude || !input.studentLongitude) {
-            throw new Error("يجب تفعيل الموقع لتسجيل الحضور في هذه الجلسة");
+            throw new Error(`يجب تفعيل الموقع لتسجيل الحضور في هذه الجلسة (Debug: Session=${session.id}, Lat=${session.latitude}, Input=${input.studentLatitude})`);
           }
 
           const locationCheck = await db.verifyLocationForSession(
