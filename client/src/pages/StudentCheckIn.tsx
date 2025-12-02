@@ -92,7 +92,21 @@ export default function StudentCheckIn() {
           (error) => {
             setIsGettingLocation(false);
             console.warn("Location error:", error);
-            toast.error("يجب السماح بالوصول للموقع لتسجيل الحضور في هذه الجلسة");
+            let errorMessage = "يجب السماح بالوصول للموقع لتسجيل الحضور في هذه الجلسة";
+
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = "تم رفض الوصول للموقع. يرجى تفعيل الموقع من إعدادات المتصفح (أيقونة القفل بجانب الرابط) ثم المحاولة مرة أخرى.";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = "تعذر تحديد موقعك. تأكد من تفعيل GPS.";
+                break;
+              case error.TIMEOUT:
+                errorMessage = "انتهت مهلة تحديد الموقع. حاول مرة أخرى.";
+                break;
+            }
+
+            toast.error(errorMessage, { duration: 5000 });
           }
         );
       } else {
