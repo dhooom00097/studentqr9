@@ -65,19 +65,24 @@ export default function TeacherDashboard() {
 
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Creating session...", { title, requireLocation });
+
     if (!title.trim()) {
       toast.error("يرجى إدخال عنوان الجلسة");
       return;
     }
 
     if (requireLocation) {
+      console.log("Location required, checking navigator.geolocation...");
       if (!navigator.geolocation) {
+        console.error("Geolocation not supported");
         toast.error("المتصفح لا يدعم تحديد الموقع");
         return;
       }
       toast.info("جاري تحديد موقعك...");
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log("Position obtained:", position.coords);
           createMutation.mutate({
             title,
             description,
@@ -89,10 +94,11 @@ export default function TeacherDashboard() {
         },
         (error) => {
           console.error("Location error:", error);
-          toast.error("فشل تحديد الموقع. تأكد من تفعيل الـ GPS والسماح للموقع.");
+          toast.error(`فشل تحديد الموقع: ${error.message}`);
         }
       );
     } else {
+      console.log("Location not required, creating immediately...");
       createMutation.mutate({
         title,
         description,
