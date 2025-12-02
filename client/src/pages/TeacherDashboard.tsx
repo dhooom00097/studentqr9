@@ -20,6 +20,8 @@ export default function TeacherDashboard() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedClassId, setSelectedClassId] = useState<string>("none");
+  const [requireLocation, setRequireLocation] = useState(false);
+  const [teacherLocation, setTeacherLocation] = useState<{ lat: number; lon: number } | null>(null);
 
   useEffect(() => {
     const loggedIn = localStorage.getItem("teacher_logged_in") === "true";
@@ -67,11 +69,36 @@ export default function TeacherDashboard() {
       toast.error("يرجى إدخال عنوان الجلسة");
       return;
     }
-    createMutation.mutate({
-      title,
-      description,
-      classId: selectedClassId !== "none" ? parseInt(selectedClassId) : undefined
-    });
+
+    if (requireLocation) {
+      if (!navigator.geolocation) {
+        toast.error("المتصفح لا يدعم تحديد الموقع");
+        return;
+      }
+      toast.info("جاري تحديد موقعك...");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          createMutation.mutate({
+            title,
+            description,
+            classId: selectedClassId !== "none" ? parseInt(selectedClassId) : undefined,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            radius: 500 // Default 500m
+          });
+        },
+        (error) => {
+          console.error("Location error:", error);
+          toast.error("فشل تحديد الموقع. تأكد من تفعيل الـ GPS والسماح للموقع.");
+        }
+      );
+    } else {
+      createMutation.mutate({
+        title,
+        description,
+        classId: selectedClassId !== "none" ? parseInt(selectedClassId) : undefined
+      });
+    }
   };
 
   const handleLogout = () => {
@@ -168,6 +195,24 @@ export default function TeacherDashboard() {
                     عند اختيار فصل، سيتم تقييد الحضور بطلاب هذا الفصل فقط.
                   </p>
                 </div>
+
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                    <input
+                      type="checkbox"
+                      id="location"
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={requireLocation}
+                      onChange={(e) => setRequireLocation(e.target.checked)}
+                    />
+                    <Label htmlFor="location">تفعيل التحقق من الموقع الجغرافي</Label>
+                  </div>
+                </div>
+                {requireLocation && (
+                  <p className="text-xs text-gray-500 mr-6">
+                    سيتم استخدام موقعك الحالي كمركز للجلسة. يجب أن يكون الطلاب ضمن مسافة 500 متر.
+                  </p>
+                )}
                 <div className="flex gap-2 justify-end">
                   <Button
                     type="button"

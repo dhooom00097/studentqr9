@@ -325,6 +325,9 @@ export const appRouter = router({
         title: z.string().min(1),
         description: z.string().optional(),
         classId: z.number().optional(),
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
+        radius: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
         const sessionCode = randomBytes(16).toString('hex');
@@ -338,9 +341,9 @@ export const appRouter = router({
           sessionCode,
           pin,
           isActive: true,
-          latitude: null,
-          longitude: null,
-          radius: 500,
+          latitude: input.latitude ? String(input.latitude) : null,
+          longitude: input.longitude ? String(input.longitude) : null,
+          radius: input.radius || 500,
           classId: input.classId ?? null,
         } as any);
         return { success: true, sessionCode, pin };
