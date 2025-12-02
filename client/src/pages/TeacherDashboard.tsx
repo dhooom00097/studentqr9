@@ -223,6 +223,30 @@ export default function TeacherDashboard() {
                   <Button
                     type="button"
                     variant="outline"
+                    className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                    onClick={() => {
+                      toast.info("جاري اختبار الموقع...");
+                      if (!navigator.geolocation) {
+                        toast.error("المتصفح لا يدعم تحديد الموقع");
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          toast.success(`تم تحديد الموقع بنجاح: ${pos.coords.latitude}, ${pos.coords.longitude}`);
+                          console.log("Manual location test success:", pos);
+                        },
+                        (err) => {
+                          toast.error(`فشل تحديد الموقع: ${err.message} (Code: ${err.code})`);
+                          console.error("Manual location test error:", err);
+                        }
+                      );
+                    }}
+                  >
+                    اختبار الموقع 📍
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsCreateDialogOpen(false)}
                   >
                     إلغاء
