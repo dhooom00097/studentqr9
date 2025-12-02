@@ -335,39 +335,9 @@ export default function StudentCheckIn() {
           <CardDescription className="text-center">
             {sessionInfo.sessionTitle}
             {sessionInfo.sessionDescription && <div className="mt-2">{sessionInfo.sessionDescription}</div>}
-            {/* Debug Info */}
-            <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-              {/* @ts-ignore */}
-              Status: {sessionInfo.requireLocation ? "Location Required 📍" : "Location Optional 🌐"}
-            </div>
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Manual Location Trigger for Debugging */}
-          {/* @ts-ignore */}
-          {sessionInfo.requireLocation && !studentLocation && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full mb-4 border-yellow-500 text-yellow-700 hover:bg-yellow-50"
-              onClick={() => {
-                setIsGettingLocation(true);
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => {
-                    setIsGettingLocation(false);
-                    setStudentLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-                    toast.success("تم تحديد الموقع بنجاح!");
-                  },
-                  (err) => {
-                    setIsGettingLocation(false);
-                    toast.error(`Error: ${err.message} (Code: ${err.code})`);
-                  }
-                );
-              }}
-            >
-              اضغط هنا لتفعيل الموقع يدوياً 📍
-            </Button>
-          )}
           <Tabs defaultValue="form" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="form" className="text-xs">
