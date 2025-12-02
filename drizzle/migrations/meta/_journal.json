@@ -8,6 +8,13 @@
       "when": 1764103977908,
       "tag": "0000_powerful_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764698382046,
+      "tag": "0001_shallow_puppet_master",
+      "breakpoints": true
     }
   ]
 }

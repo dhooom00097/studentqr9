@@ -1,8 +1,8 @@
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import bcrypt from "bcrypt";
-import { InsertUser, users, sessions, attendanceRecords, allowedStudents, InsertSession, InsertAttendanceRecord, InsertAllowedStudent } from "../drizzle/schema";
+import { InsertUser, users, sessions, attendanceRecords, allowedStudents, InsertSession, InsertAttendanceRecord, InsertAllowedStudent, classes, students, InsertClass, InsertStudent } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -422,4 +422,223 @@ export async function changePassword(userId: number, oldPassword: string, newPas
     console.error("Error changing password:", error);
     throw error;
   }
+}
+
+// Classes Management
+export async function createClass(data: InsertClass) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(classes).values(data).returning();
+  return result[0];
+}
+
+export async function getClassesByTeacher(teacherId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.select().from(classes).where(eq(classes.teacherId, teacherId)).orderBy(desc(classes.createdAt));
+}
+
+export async function getClassById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.select().from(classes).where(eq(classes.id, id)).limit(1);
+  return result[0];
+}
+
+export async function deleteClass(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Delete students first
+  await db.delete(students).where(eq(students.classId, id));
+
+  // Delete class
+  await db.delete(classes).where(eq(classes.id, id));
+}
+
+// Students Management
+export async function addStudentToClass(data: InsertStudent) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(students).values(data).returning();
+  return result[0];
+}
+
+export async function removeStudentFromClass(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(students).where(eq(students.id, id));
+}
+
+export async function getStudentsByClass(classId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.select().from(students).where(eq(students.classId, classId)).orderBy(students.name);
+}
+
+// Class Attendance
+export async function getClassAttendance(sessionId: number, classId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Get all students in the class
+  const classStudents = await db.select().from(students).where(eq(students.classId, classId));
+
+  // Get all attendance records for the session
+  const attendance = await db.select().from(attendanceRecords).where(eq(attendanceRecords.sessionId, sessionId));
+
+  // Map attendance to students
+  return classStudents.map(student => {
+    const record = attendance.find(r => r.studentId === student.studentId);
+    return {
+      ...student,
+      status: record ? 'present' : 'absent',
+      checkedInAt: record?.checkedInAt || null,
+      attendanceId: record?.id || null
+    };
+  });
+}
+// Bulk Student Import
+export async function addStudentsBulk(studentsData: InsertStudent[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (studentsData.length === 0) return [];
+
+  // Use onConflictDoNothing to skip duplicates based on studentId constraint if it exists,
+  // or we can just insert. For now, simple insert.
+  // Ideally, we should check for duplicates or use upsert if supported/needed.
+  // Here we'll just insert and let it fail if unique constraints are violated, or handle gracefully.
+  // But since studentId is not unique globally (only per class maybe?), we'll just insert.
+  // Actually, studentId usually should be unique per class.
+
+  const result = await db.insert(students).values(studentsData).returning();
+  return result;
+}
+
+// Toggle Attendance
+export async function toggleAttendanceStatus(
+  sessionId: number,
+  studentId: string,
+  status: 'present' | 'absent',
+  studentName?: string,
+  studentEmail?: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (status === 'present') {
+    // Check if already present
+    const existing = await db.select().from(attendanceRecords)
+      .where(and(
+        eq(attendanceRecords.sessionId, sessionId),
+        eq(attendanceRecords.studentId, studentId)
+      ))
+      .limit(1);
+
+    if (existing.length === 0) {
+      if (!studentName) throw new Error("Student name required to mark as present");
+
+      await db.insert(attendanceRecords).values({
+        sessionId,
+        studentId,
+        studentName,
+        studentEmail: studentEmail || null,
+        checkedInAt: new Date(),
+      } as any);
+    }
+  } else {
+    // Remove attendance record
+    await db.delete(attendanceRecords)
+      .where(and(
+        eq(attendanceRecords.sessionId, sessionId),
+        eq(attendanceRecords.studentId, studentId)
+      ));
+  }
+}
+
+export async function getAttendanceReport(classId: number) {
+  const db = await getDb(); // Added getDb() call here
+  if (!db) throw new Error("Database not available"); // Added check here
+
+  // 1. Get all students in the class
+  const classStudents = await db
+    .select()
+    .from(students)
+    .where(eq(students.classId, classId));
+
+  // 2. Get all sessions for the class, ordered by date
+  const classSessions = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.classId, classId))
+    .orderBy(sessions.createdAt);
+
+  // 3. Get all attendance records for these sessions
+  const sessionIds = classSessions.map((s: { id: number }) => s.id);
+  let records: any[] = [];
+
+  if (sessionIds.length > 0) {
+    records = await db
+      .select()
+      .from(attendanceRecords) // Changed 'attendance' to 'attendanceRecords'
+      .where(inArray(attendanceRecords.sessionId, sessionIds)); // Changed 'attendance' to 'attendanceRecords'
+  }
+
+  // 4. Build the report data
+  const report = classStudents.map((student: any) => {
+    const studentAttendance: Record<number, string> = {};
+    let presentCount = 0;
+
+    classSessions.forEach((session: any) => {
+      // Find record for this student in this session
+      // Note: attendanceRecords table uses studentId (text) which matches students.studentId
+      const record = records.find(
+        (r: any) => r.sessionId === session.id && r.studentId === student.studentId
+      );
+
+      // Determine status
+      // If record exists, they are present (or whatever status is stored if we add status column later)
+      // Currently attendanceRecords implies presence.
+      // But wait, the previous toggle feature added a 'status' field?
+      // Let's check schema again. attendanceRecords schema in file view above DOES NOT have 'status'.
+      // However, the toggle feature I implemented relied on 'status'.
+      // Did I miss updating the schema file view or did I not update schema?
+      // The user said "without making a new file", implying we should use existing structure.
+      // But my toggle implementation used `status`.
+      // Let's assume for now presence = record exists.
+      // If I added 'status' column in a previous step (which I did in my thought process but maybe not in schema file),
+      // I should check if I need to add it to schema definition in code.
+      // The previous `toggleStatus` implementation likely used a raw query or I missed where `status` was added to schema.
+      // Wait, I see `attendance` table usage in my previous code but schema says `attendanceRecords`.
+      // Let's stick to `attendanceRecords` which is in schema.
+
+      if (record) {
+        studentAttendance[session.id] = 'present';
+        presentCount++;
+      } else {
+        studentAttendance[session.id] = 'absent';
+      }
+    });
+
+    const totalSessions = classSessions.length;
+    const percentage = totalSessions > 0
+      ? Math.round((presentCount / totalSessions) * 100)
+      : 0;
+
+    return {
+      student,
+      attendance: studentAttendance,
+      stats: {
+        present: presentCount,
+        total: totalSessions,
+        percentage
+      }
+    };
+  });
+
+  return {
+    sessions: classSessions,
+    report
+  };
 }

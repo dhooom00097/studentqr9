@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { Loader2, ArrowRight, Download, Users, QrCode as QrCodeIcon, MapPin, Plus, Trash2, Upload } from "lucide-react";
+import { Loader2, ArrowRight, Download, Users, QrCode as QrCodeIcon, MapPin, Plus, Trash2, Upload, CheckCircle, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import QRCode from "qrcode";
@@ -30,18 +30,30 @@ export default function SessionDetails() {
     { enabled: sessionId > 0 }
   );
 
+  const isClassSession = !!session?.classId;
+
   const { data: attendance, refetch: refetchAttendance } = trpc.attendance.getBySession.useQuery(
     { sessionId },
     { enabled: sessionId > 0 }
   );
 
-  const toggleMutation = trpc.sessions.toggleStatus.useMutation({
+  const toggleSessionMutation = trpc.sessions.toggleStatus.useMutation({
     onSuccess: () => {
       toast.success("تم تحديث حالة الجلسة");
       refetch();
     },
     onError: (error) => {
       toast.error(error.message || "حدث خطأ");
+    },
+  });
+
+  const toggleStatusMutation = trpc.attendance.toggleStatus.useMutation({
+    onSuccess: () => {
+      toast.success("تم تحديث حالة الحضور");
+      refetchAttendance();
+    },
+    onError: (error) => {
+      toast.error(error.message || "حدث خطأ أثناء تحديث الحالة");
     },
   });
 
@@ -211,15 +223,16 @@ export default function SessionDetails() {
       return;
     }
 
-    const data = attendance.map((record, index) => ({
+    const data = attendance.map((record: any, index) => ({
       "#": index + 1,
-      "اسم الطالب": record.studentName,
+      "اسم الطالب": record.studentName || record.name,
       "الرقم الجامعي": record.studentId || "-",
-      "البريد الإلكتروني": record.studentEmail || "-",
+      "البريد الإلكتروني": record.studentEmail || record.email || "-",
       "موقع الطالب": record.studentLatitude && record.studentLongitude
         ? `${record.studentLatitude}, ${record.studentLongitude}`
         : "-",
-      "وقت الحضور": new Date(record.checkedInAt).toLocaleString("ar-SA"),
+      "وقت الحضور": record.checkedInAt ? new Date(record.checkedInAt).toLocaleString("ar-SA") : "غائب",
+      "الحالة": record.status === 'present' || record.checkedInAt ? "حاضر" : "غائب",
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -321,9 +334,9 @@ export default function SessionDetails() {
                   id="active-status"
                   checked={Boolean(session.isActive)}
                   onCheckedChange={(checked) => {
-                    toggleMutation.mutate({ id: session.id, isActive: checked });
+                    toggleSessionMutation.mutate({ id: session.id, isActive: checked });
                   }}
-                  disabled={toggleMutation.isPending}
+                  disabled={toggleSessionMutation.isPending}
                 />
                 <Label htmlFor="active-status" className="cursor-pointer">
                   {session.isActive ? "الجلسة مفتوحة للحضور" : "الجلسة مغلقة"}
@@ -348,6 +361,16 @@ export default function SessionDetails() {
                     {attendance?.length || 0}
                   </span>
                 </div>
+                {isClassSession && (
+                  <div className="flex justify-between items-center p-4 bg-green-50 rounded-lg">
+                    <span className="text-gray-700 font-medium">نسبة الحضور</span>
+                    <span className="text-3xl font-bold text-green-600">
+                      {attendance && attendance.length > 0
+                        ? Math.round((attendance.filter((r: any) => r.status === 'present' || r.checkedInAt).length / attendance.length) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
                   <span className="text-gray-700 font-medium">تاريخ الإنشاء</span>
                   <span className="text-gray-900">
@@ -487,113 +510,115 @@ export default function SessionDetails() {
           </CardContent>
         </Card>
 
-        {/* Allowed Students Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              قائمة الطلاب المسموح لهم (Whitelist)
-            </CardTitle>
-            <CardDescription>
-              حدد الطلاب المسموح لهم بالتسجيل في هذه الجلسة. إذا كانت القائمة فارغة، سيسمح للجميع بالتسجيل.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 mb-6 items-end">
-              <div className="flex-1 space-y-2">
-                <Label>الرقم الجامعي (مطلوب)</Label>
-                <Input
-                  value={newStudentId}
-                  onChange={(e) => setNewStudentId(e.target.value)}
-                  placeholder="مثال: 441234567"
-                />
+        {/* Hide Allowed Students Card if it's a Class Session */}
+        {!isClassSession && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                قائمة الطلاب المسموح لهم (Whitelist)
+              </CardTitle>
+              <CardDescription>
+                حدد الطلاب المسموح لهم بالتسجيل في هذه الجلسة. إذا كانت القائمة فارغة، سيسمح للجميع بالتسجيل.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4 mb-6 items-end">
+                <div className="flex-1 space-y-2">
+                  <Label>الرقم الجامعي (مطلوب)</Label>
+                  <Input
+                    value={newStudentId}
+                    onChange={(e) => setNewStudentId(e.target.value)}
+                    placeholder="مثال: 441234567"
+                  />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>اسم الطالب (اختياري)</Label>
+                  <Input
+                    value={newStudentName}
+                    onChange={(e) => setNewStudentName(e.target.value)}
+                    placeholder="اسم الطالب"
+                  />
+                </div>
+                <Button
+                  onClick={handleAddAllowedStudent}
+                  disabled={addAllowedStudentMutation.isPending}
+                >
+                  {addAllowedStudentMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4 ml-2" />
+                  )}
+                  إضافة
+                </Button>
               </div>
-              <div className="flex-1 space-y-2">
-                <Label>اسم الطالب (اختياري)</Label>
-                <Input
-                  value={newStudentName}
-                  onChange={(e) => setNewStudentName(e.target.value)}
-                  placeholder="اسم الطالب"
+
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
                 />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  disabled={addAllowedStudentsBulkMutation.isPending}
+                  className="flex-1"
+                >
+                  {addAllowedStudentsBulkMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  ) : (
+                    <Upload className="w-4 h-4 ml-2" />
+                  )}
+                  رفع ملف Excel/CSV
+                </Button>
               </div>
-              <Button
-                onClick={handleAddAllowedStudent}
-                disabled={addAllowedStudentMutation.isPending}
-              >
-                {addAllowedStudentMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4 ml-2" />
-                )}
-                إضافة
-              </Button>
-            </div>
 
-            <div className="flex gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                disabled={addAllowedStudentsBulkMutation.isPending}
-                className="flex-1"
-              >
-                {addAllowedStudentsBulkMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                ) : (
-                  <Upload className="w-4 h-4 ml-2" />
-                )}
-                رفع ملف Excel/CSV
-              </Button>
-            </div>
-
-            {allowedStudents && allowedStudents.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-right p-3 font-semibold">الرقم الجامعي</th>
-                      <th className="text-right p-3 font-semibold">الاسم</th>
-                      <th className="text-right p-3 font-semibold">تاريخ الإضافة</th>
-                      <th className="text-right p-3 font-semibold">إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {allowedStudents.map((student) => (
-                      <tr key={student.id} className="border-t">
-                        <td className="p-3 font-medium">{student.studentId}</td>
-                        <td className="p-3">{student.studentName || "-"}</td>
-                        <td className="p-3 text-gray-500">
-                          {new Date(student.createdAt).toLocaleDateString("ar-SA")}
-                        </td>
-                        <td className="p-3">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveStudent(student.studentId)}
-                            disabled={removeAllowedStudentMutation.isPending}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </td>
+              {allowedStudents && allowedStudents.length > 0 ? (
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-right p-3 font-semibold">الرقم الجامعي</th>
+                        <th className="text-right p-3 font-semibold">الاسم</th>
+                        <th className="text-right p-3 font-semibold">تاريخ الإضافة</th>
+                        <th className="text-right p-3 font-semibold">إجراءات</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed">
-                <p className="text-gray-500">القائمة فارغة - التسجيل متاح للجميع</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </thead>
+                    <tbody>
+                      {allowedStudents.map((student) => (
+                        <tr key={student.id} className="border-t">
+                          <td className="p-3 font-medium">{student.studentId}</td>
+                          <td className="p-3">{student.studentName || "-"}</td>
+                          <td className="p-3 text-gray-500">
+                            {new Date(student.createdAt).toLocaleDateString("ar-SA")}
+                          </td>
+                          <td className="p-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveStudent(student.studentId)}
+                              disabled={removeAllowedStudentMutation.isPending}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed">
+                  <p className="text-gray-500">القائمة فارغة - التسجيل متاح للجميع</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Attendance List */}
         <Card>
@@ -614,19 +639,21 @@ export default function SessionDetails() {
                       <th className="text-right p-3 font-semibold">الرقم الجامعي</th>
                       <th className="text-right p-3 font-semibold">البريد الإلكتروني</th>
                       <th className="text-right p-3 font-semibold">الموقع</th>
+                      <th className="text-right p-3 font-semibold">الحالة</th>
                       <th className="text-right p-3 font-semibold">وقت الحضور</th>
+                      <th className="text-right p-3 font-semibold">إجراءات</th> {/* Added Actions column */}
                     </tr>
                   </thead>
                   <tbody>
-                    {attendance.map((record, index) => (
-                      <tr key={record.id} className="border-b hover:bg-gray-50">
+                    {attendance.map((record: any, index) => (
+                      <tr key={record.id || index} className={`border-b hover:bg-gray-50 ${isClassSession && !(record.status === 'present' || record.checkedInAt) ? 'bg-red-50' : ''}`}>
                         <td className="p-3">{index + 1}</td>
-                        <td className="p-3 font-medium">{record.studentName}</td>
+                        <td className="p-3 font-medium">{record.studentName || record.name}</td>
                         <td className="p-3 text-gray-600">
                           {record.studentId || "-"}
                         </td>
                         <td className="p-3 text-gray-600">
-                          {record.studentEmail || "-"}
+                          {record.studentEmail || record.email || "-"}
                         </td>
                         <td className="p-3 text-gray-600 text-xs">
                           {record.studentLatitude && record.studentLongitude ? (
@@ -642,8 +669,36 @@ export default function SessionDetails() {
                             "-"
                           )}
                         </td>
+                        <td className="p-3">
+                          {record.status === 'present' || record.checkedInAt ? (
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 gap-1">
+                              <CheckCircle className="w-3 h-3" />
+                              حاضر
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive" className="gap-1">
+                              <XCircle className="w-3 h-3" />
+                              غائب
+                            </Badge>
+                          )}
+                        </td>
                         <td className="p-3 text-gray-600">
-                          {new Date(record.checkedInAt).toLocaleString("ar-SA")}
+                          {record.checkedInAt ? new Date(record.checkedInAt).toLocaleString("ar-SA") : "-"}
+                        </td>
+                        <td className="p-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleStatusMutation.mutate({
+                              sessionId: session.id,
+                              studentId: record.studentId,
+                              status: record.status === 'present' ? 'absent' : 'present',
+                              studentName: record.name || record.studentName,
+                            })}
+                            disabled={toggleStatusMutation.isPending}
+                          >
+                            {record.status === 'present' ? "تغيير لغائب" : "تغيير لحاضر"}
+                          </Button>
                         </td>
                       </tr>
                     ))}

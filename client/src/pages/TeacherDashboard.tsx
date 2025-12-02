@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Plus, QrCode, Users, Clock, Eye, Trash2, Settings } from "lucide-react";
+import { Loader2, Plus, QrCode, Users, Clock, Eye, Trash2, Settings, BookOpen } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -18,6 +19,7 @@ export default function TeacherDashboard() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState<string>("none");
 
   useEffect(() => {
     const loggedIn = localStorage.getItem("teacher_logged_in") === "true";
@@ -32,12 +34,16 @@ export default function TeacherDashboard() {
     undefined,
     { enabled: isLoggedIn }
   );
+
+  const { data: classes } = trpc.classes.list.useQuery(undefined, { enabled: isLoggedIn });
+
   const createMutation = trpc.sessions.create.useMutation({
     onSuccess: () => {
       toast.success("تم إنشاء الجلسة بنجاح");
       setIsCreateDialogOpen(false);
       setTitle("");
       setDescription("");
+      setSelectedClassId("none");
       refetch();
     },
     onError: (error) => {
@@ -61,7 +67,11 @@ export default function TeacherDashboard() {
       toast.error("يرجى إدخال عنوان الجلسة");
       return;
     }
-    createMutation.mutate({ title, description });
+    createMutation.mutate({
+      title,
+      description,
+      classId: selectedClassId !== "none" ? parseInt(selectedClassId) : undefined
+    });
   };
 
   const handleLogout = () => {
@@ -95,6 +105,10 @@ export default function TeacherDashboard() {
             <Button onClick={() => setLocation("/settings")} variant="outline" className="gap-2">
               <Settings className="w-4 h-4" />
               الإعدادات
+            </Button>
+            <Button onClick={() => setLocation("/classes")} variant="outline" className="gap-2">
+              <BookOpen className="w-4 h-4" />
+              إدارة الفصول
             </Button>
             <Button onClick={handleLogout} variant="outline">
               تسجيل الخروج
@@ -134,6 +148,25 @@ export default function TeacherDashboard() {
                     placeholder="وصف مختصر للجلسة..."
                     rows={3}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="class">الفصل الدراسي (اختياري)</Label>
+                  <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر فصلاً دراسياً" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">بدون فصل (عام)</SelectItem>
+                      {classes?.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id.toString()}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-gray-500">
+                    عند اختيار فصل، سيتم تقييد الحضور بطلاب هذا الفصل فقط.
+                  </p>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <Button

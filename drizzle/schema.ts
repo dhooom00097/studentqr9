@@ -54,10 +54,52 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   /** When the session was last updated */
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  /** Optional: Link to a specific class */
+  classId: integer("classId"),
 });
 
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
+
+/**
+ * Classes table - groups of students managed by a teacher
+ */
+export const classes = pgTable("classes", {
+  id: serial("id").primaryKey(),
+  /** Teacher who owns this class */
+  teacherId: integer("teacherId").notNull(),
+  /** Class name (e.g. "Math 101") */
+  name: text("name").notNull(),
+  /** Optional description */
+  description: text("description"),
+  /** When the class was created */
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  /** When the class was last updated */
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Class = typeof classes.$inferSelect;
+export type InsertClass = typeof classes.$inferInsert;
+
+/**
+ * Students table - students enrolled in a class
+ */
+export const students = pgTable("students", {
+  id: serial("id").primaryKey(),
+  /** Class this student belongs to */
+  classId: integer("classId").notNull(),
+  /** Student ID (university ID) */
+  studentId: text("studentId").notNull(),
+  /** Student Name */
+  name: text("name").notNull(),
+  /** Student Email (optional) */
+  email: text("email"),
+  /** When the student was added */
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Student = typeof students.$inferSelect;
+export type InsertStudent = typeof students.$inferInsert;
 
 // Type overrides for nullable GPS fields
 export interface SessionWithGPS extends Session {

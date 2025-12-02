@@ -58,11 +58,124 @@ export const appRouter = router({
       }),
   }),
 
+  classes: router({
+    create: publicProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        // Use default teacher ID 1
+        return await db.createClass({
+          teacherId: 1,
+          name: input.name,
+          description: input.description || null,
+        } as any);
+      }),
+
+    list: publicProcedure.query(async () => {
+      return await db.getClassesByTeacher(1);
+    }),
+
+    getById: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getClassById(input.id);
+      }),
+
+    delete: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deleteClass(input.id);
+        return { success: true };
+      }),
+
+    addStudent: publicProcedure
+      .input(z.object({
+        classId: z.number(),
+        studentId: z.string().min(1),
+        name: z.string().min(1),
+        email: z.string().email().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return await db.addStudentToClass({
+          classId: input.classId,
+          studentId: input.studentId,
+          name: input.name,
+          email: input.email || null,
+        } as any);
+      }),
+
+    removeStudent: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.removeStudentFromClass(input.id);
+        return { success: true };
+      }),
+
+    getStudents: publicProcedure
+      .input(z.object({ classId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getStudentsByClass(input.classId);
+      }),
+    // Add students in bulk
+    addStudentsBulk: publicProcedure
+      .input(z.object({
+        classId: z.number(),
+        students: z.array(z.object({
+          studentId: z.string().min(1),
+          name: z.string().min(1),
+          email: z.string().optional(),
+        })),
+      }))
+      .mutation(async ({ input }) => {
+        const studentsData = input.students.map(s => ({
+          classId: input.classId,
+          studentId: s.studentId,
+          name: s.name,
+          email: s.email || null,
+        }));
+        return await db.addStudentsBulk(studentsData as any);
+      }),
+
+    getAttendanceReport: publicProcedure
+      .input(z.object({
+        classId: z.number(),
+      }))
+      .query(async ({ input }) => {
+        return await db.getAttendanceReport(input.classId);
+      }),
+  }),
+
   attendance: router({
+    // Toggle attendance status (Manual override)
+    toggleStatus: publicProcedure
+      .input(z.object({
+        sessionId: z.number(),
+        studentId: z.string(),
+        status: z.enum(['present', 'absent']),
+        studentName: z.string().optional(),
+        studentEmail: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.toggleAttendanceStatus(
+          input.sessionId,
+          input.studentId,
+          input.status,
+          input.studentName,
+          input.studentEmail
+        );
+        return { success: true };
+      }),
+
     // Get attendance records for a session
     getBySession: publicProcedure
       .input(z.object({ sessionId: z.number() }))
       .query(async ({ input }) => {
+        const session = await db.getSessionById(input.sessionId);
+        if (session && session.classId) {
+          return await db.getClassAttendance(input.sessionId, session.classId);
+        }
         return await db.getAttendanceBySession(input.sessionId);
       }),
 
@@ -103,12 +216,25 @@ export const appRouter = router({
         }
 
         // Check if student is allowed (Whitelist)
-        const isAllowed = await db.isStudentAllowed(session.id, input.studentId);
-        if (!isAllowed) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "عذراً، لست في قائمة الطلاب المسموح لهم بالتسجيل في هذه الجلسة",
-          });
+        // If session is linked to a class, check if student is in the class
+        if (session.classId) {
+          const classStudents = await db.getStudentsByClass(session.classId);
+          const isEnrolled = classStudents.some(s => s.studentId === input.studentId);
+          if (!isEnrolled) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "عذراً، لست مسجلاً في هذا الفصل الدراسي",
+            });
+          }
+        } else {
+          // Fallback to manual whitelist
+          const isAllowed = await db.isStudentAllowed(session.id, input.studentId);
+          if (!isAllowed) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "عذراً، لست في قائمة الطلاب المسموح لهم بالتسجيل في هذه الجلسة",
+            });
+          }
         }
 
         // Check for duplicate attendance
@@ -182,6 +308,7 @@ export const appRouter = router({
       .input(z.object({
         title: z.string().min(1),
         description: z.string().optional(),
+        classId: z.number().optional(),
       }))
       .mutation(async ({ input }) => {
         const sessionCode = randomBytes(16).toString('hex');
@@ -194,10 +321,11 @@ export const appRouter = router({
           description: input.description || null,
           sessionCode,
           pin,
-          isActive: 1,
+          isActive: true,
           latitude: null,
           longitude: null,
           radius: 500,
+          classId: input.classId ?? null,
         } as any);
         return { success: true, sessionCode, pin };
       }),
@@ -218,6 +346,7 @@ export const appRouter = router({
         return {
           ...session,
           attendanceCount: attendance.length,
+          class: session.classId ? await db.getClassById(session.classId) : null,
         };
       }),
 
