@@ -177,6 +177,20 @@ export async function checkDuplicateAttendance(sessionId: number, studentName: s
   return existing.length > 0;
 }
 
+export async function checkDuplicateIp(sessionId: number, ipAddress: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db.select().from(attendanceRecords).where(
+    and(
+      eq(attendanceRecords.sessionId, sessionId),
+      eq(attendanceRecords.ipAddress, ipAddress)
+    )
+  ).limit(1);
+
+  return existing.length > 0;
+}
+
 
 // GPS Location verification
 export function calculateDistance(
