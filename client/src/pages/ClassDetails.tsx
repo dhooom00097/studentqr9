@@ -123,13 +123,38 @@ export default function ClassDetails() {
                     startIndex = 1;
                 }
 
+                // Detect columns based on content of the first valid row
+                let nameIdx = 0;
+                let idIdx = 1;
+                let emailIdx = 2;
+
+                // Check first data row (after header)
+                if (data.length > startIndex) {
+                    const firstRow: any = data[startIndex];
+                    if (firstRow) {
+                        const col0 = firstRow[0] ? String(firstRow[0]).trim() : "";
+                        const col1 = firstRow[1] ? String(firstRow[1]).trim() : "";
+
+                        // If col0 looks like an ID (digits) and col1 looks like a name (letters/non-digits), swap
+                        // Using a simple regex: ID is mostly digits, Name has letters
+                        const isCol0Numeric = /^\d+$/.test(col0);
+                        const isCol1Numeric = /^\d+$/.test(col1);
+
+                        if (isCol0Numeric && !isCol1Numeric) {
+                            nameIdx = 1;
+                            idIdx = 0;
+                            console.log("Detected swapped columns: ID is first, Name is second");
+                        }
+                    }
+                }
+
                 for (let i = startIndex; i < data.length; i++) {
                     const row: any = data[i];
-                    if (row[0] && row[1]) { // Name and ID required
+                    if (row[nameIdx] && row[idIdx]) { // Name and ID required
                         studentsToAdd.push({
-                            name: String(row[0]).trim(),
-                            studentId: String(row[1]).trim(),
-                            email: row[2] ? String(row[2]).trim() : undefined,
+                            name: String(row[nameIdx]).trim(),
+                            studentId: String(row[idIdx]).trim(),
+                            email: row[emailIdx] ? String(row[emailIdx]).trim() : undefined,
                         });
                     }
                 }
