@@ -35,6 +35,10 @@ export default function StudentCheckIn() {
     onSuccess: (data) => {
       setIsSuccess(true);
       setSessionTitle(data.sessionTitle);
+      // Set flag in localStorage to prevent re-registration from this device
+      if (sessionInfo?.sessionId) {
+        localStorage.setItem(`attendance_registered_${sessionInfo.sessionId}`, 'true');
+      }
       toast.success("تم تسجيل حضورك بنجاح!");
     },
     onError: (error) => {
@@ -44,6 +48,16 @@ export default function StudentCheckIn() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check for device restriction
+    if (sessionInfo?.sessionId) {
+      const isRegistered = localStorage.getItem(`attendance_registered_${sessionInfo.sessionId}`);
+      if (isRegistered) {
+        toast.error("عذراً، تم تسجيل الحضور مسبقاً من هذا الجهاز لهذه الجلسة.");
+        return;
+      }
+    }
+
     if (!studentName.trim()) {
       toast.error("يرجى إدخال اسمك");
       return;

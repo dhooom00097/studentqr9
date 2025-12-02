@@ -273,6 +273,7 @@ export const appRouter = router({
         }
         return {
           valid: true,
+          sessionId: session.id,
           sessionTitle: session.title,
           sessionDescription: session.description,
         };
