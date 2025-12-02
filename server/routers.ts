@@ -189,7 +189,7 @@ export const appRouter = router({
         studentLatitude: z.number().optional(),
         studentLongitude: z.number().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         // Find session by code
         const session = await db.getSessionByCode(input.sessionCode);
         if (!session) {
@@ -237,7 +237,21 @@ export const appRouter = router({
           }
         }
 
-        // Check for duplicate attendance
+        // Check for duplicate attendance by IP
+        const ipAddress = ctx.req.headers['x-forwarded-for'] || ctx.req.socket.remoteAddress;
+        const clientIp = Array.isArray(ipAddress) ? ipAddress[0] : ipAddress;
+
+        if (clientIp) {
+          const isIpDuplicate = await db.checkDuplicateIp(session.id, clientIp);
+          if (isIpDuplicate) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "عذراً، تم تسجيل الحضور مسبقاً من هذا الجهاز (IP) لهذه الجلسة",
+            });
+          }
+        }
+
+        // Check for duplicate attendance by Student ID/Name
         const isDuplicate = await db.checkDuplicateAttendance(session.id, input.studentName, input.studentId);
         if (isDuplicate) {
           throw new TRPCError({
@@ -252,6 +266,7 @@ export const appRouter = router({
           studentEmail: input.studentEmail || null,
           studentLatitude: input.studentLatitude ? String(input.studentLatitude) : null,
           studentLongitude: input.studentLongitude ? String(input.studentLongitude) : null,
+          ipAddress: clientIp || null,
         } as any);
 
         return {

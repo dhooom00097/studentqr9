@@ -15,6 +15,13 @@
       "when": 1764698382046,
       "tag": "0001_shallow_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764703011496,
+      "tag": "0002_clever_hedge_knight",
+      "breakpoints": true
     }
   ]
 }

@@ -124,6 +124,8 @@ export const attendanceRecords = pgTable("attendanceRecords", {
   studentLatitude: text("studentLatitude"),
   /** Student location at check-in - Longitude */
   studentLongitude: text("studentLongitude"),
+  /** IP Address of the device used for check-in */
+  ipAddress: text("ipAddress"),
   /** When the student checked in */
   checkedInAt: timestamp("checkedInAt").defaultNow().notNull(),
 });
