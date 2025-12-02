@@ -67,34 +67,46 @@ export default function StudentCheckIn() {
       return;
     }
 
-    // Get user location
-    setIsGettingLocation(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setIsGettingLocation(false);
-          setStudentLocation({
-            lat: position.coords.latitude,
-            lon: position.coords.longitude,
-          });
-          checkInMutation.mutate({
-            sessionCode,
-            studentName,
-            studentId,
-            studentEmail: studentEmail || undefined,
-            studentLatitude: position.coords.latitude,
-            studentLongitude: position.coords.longitude,
-          });
-        },
-        (error) => {
-          setIsGettingLocation(false);
-          console.warn("Location error:", error);
-          toast.error("يجب السماح بالوصول للموقع لتسجيل الحضور");
-        }
-      );
+    // Check if session requires location
+    // @ts-ignore - property added in backend
+    if (sessionInfo?.requireLocation) {
+      setIsGettingLocation(true);
+      if (navigator.geolocation) {
+        toast.info("جاري التحقق من الموقع...");
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setIsGettingLocation(false);
+            setStudentLocation({
+              lat: position.coords.latitude,
+              lon: position.coords.longitude,
+            });
+            checkInMutation.mutate({
+              sessionCode,
+              studentName,
+              studentId,
+              studentEmail: studentEmail || undefined,
+              studentLatitude: position.coords.latitude,
+              studentLongitude: position.coords.longitude,
+            });
+          },
+          (error) => {
+            setIsGettingLocation(false);
+            console.warn("Location error:", error);
+            toast.error("يجب السماح بالوصول للموقع لتسجيل الحضور في هذه الجلسة");
+          }
+        );
+      } else {
+        setIsGettingLocation(false);
+        toast.error("المتصفح لا يدعم تحديد الموقع");
+      }
     } else {
-      setIsGettingLocation(false);
-      toast.error("المتصفح لا يدعم تحديد الموقع");
+      // Session does not require location
+      checkInMutation.mutate({
+        sessionCode,
+        studentName,
+        studentId,
+        studentEmail: studentEmail || undefined,
+      });
     }
   };
 
