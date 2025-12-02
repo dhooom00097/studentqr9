@@ -356,6 +356,63 @@ export default function StudentCheckIn() {
 
             <TabsContent value="form" className="space-y-4 mt-4">
               <form onSubmit={handleSubmit} className="space-y-4">
+
+                {/* Explicit Location Verification Button */}
+                {/* @ts-ignore */}
+                {sessionInfo.requireLocation && !studentLocation && (
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-4">
+                    <p className="text-sm text-blue-800 mb-3 text-center">
+                      هذه الجلسة تتطلب التحقق من موقعك الجغرافي.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-blue-500 text-blue-700 hover:bg-blue-100"
+                      onClick={() => {
+                        setIsGettingLocation(true);
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            setIsGettingLocation(false);
+                            setStudentLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+                            toast.success("تم تحديد الموقع بنجاح! يمكنك الآن تسجيل الحضور.");
+                          },
+                          (err) => {
+                            setIsGettingLocation(false);
+                            let errorMessage = "فشل تحديد الموقع";
+                            switch (err.code) {
+                              case err.PERMISSION_DENIED: errorMessage = "تم رفض الإذن. يرجى تفعيل الموقع من إعدادات المتصفح."; break;
+                              case err.POSITION_UNAVAILABLE: errorMessage = "الموقع غير متاح. تأكد من تفعيل GPS."; break;
+                              case err.TIMEOUT: errorMessage = "انتهت المهلة. حاول مرة أخرى."; break;
+                            }
+                            toast.error(errorMessage);
+                          },
+                          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                        );
+                      }}
+                    >
+                      {isGettingLocation ? (
+                        <>
+                          <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                          جاري التحقق...
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="w-4 h-4 ml-2" />
+                          التحقق من الموقع
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Location Success Indicator */}
+                {studentLocation && (
+                  <div className="bg-green-50 p-3 rounded-lg border border-green-200 mb-4 flex items-center justify-center text-green-700 text-sm">
+                    <CheckCircle className="w-4 h-4 ml-2" />
+                    تم التحقق من الموقع بنجاح ✅
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="name">الاسم الكامل *</Label>
                   <Input
